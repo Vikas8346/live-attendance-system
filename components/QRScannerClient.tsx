@@ -18,10 +18,12 @@ interface QRScannerClientProps {
 export default function QRScannerClient({ onScan }: QRScannerClientProps) {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isScanning, setIsScanning] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   useEffect(() => {
     let scanner: Html5QrcodeScanner;
+    let isMounted = true;
 
     const startScanner = async () => {
       try {
@@ -37,13 +39,16 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
         scannerRef.current = scanner;
 
         const handleSuccess = async (decodedText: string) => {
-          // Stop scanning after first successful scan
-          if (scanner.getState() === Html5QrcodeScannerState.SCANNING) {
-            scanner.pause();
-            setIsScanning(false);
-          }
+          if (!isMounted) return;
 
           try {
+            // Pause scanner
+            const currentState = scanner.getState();
+            if (currentState === Html5QrcodeScannerState.SCANNING) {
+              await scanner.pause();
+              setIsScanning(false);
+            }
+
             const response = await fetch('/api/scan', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -65,9 +70,12 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
 
             // Resume after 2 seconds
             setTimeout(() => {
-              if (scanner) {
-                scanner.resume();
-                setIsScanning(true);
+              if (isMounted && scanner) {
+                const state = scanner.getState();
+                if (state === Html5QrcodeScannerState.PAUSED) {
+                  scanner.resume();
+                  setIsScanning(true);
+                }
               }
             }, 2000);
           } catch (error) {
@@ -75,9 +83,12 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
               success: false,
               error: 'Failed to process scan',
             });
-            if (scanner) {
-              scanner.resume();
-              setIsScanning(true);
+            if (isMounted && scanner) {
+              const state = scanner.getState();
+              if (state === Html5QrcodeScannerState.PAUSED) {
+                scanner.resume();
+                setIsScanning(true);
+              }
             }
           }
         };
@@ -87,18 +98,26 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
         };
 
         await scanner.render(handleSuccess, handleError);
+
+        if (isMounted) {
+          setIsInitialized(true);
+        }
       } catch (error) {
         console.error('Failed to start scanner:', error);
-        setScanResult({
-          success: false,
-          error: 'Failed to start camera. Please check permissions.',
-        });
+        if (isMounted) {
+          setScanResult({
+            success: false,
+            error: 'Failed to start camera. Please check permissions.',
+          });
+          setIsInitialized(true);
+        }
       }
     };
 
     startScanner();
 
     return () => {
+      isMounted = false;
       if (scannerRef.current) {
         try {
           scannerRef.current.clear();
@@ -110,23 +129,49 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
   }, [onScan]);
 
   const handlePause = async () => {
-    if (scannerRef.current) {
-      await scannerRef.current.pause();
-      setIsScanning(false);
+    if (!scannerRef.current || !isInitialized) {
+      console.warn('Scanner not ready');
+      return;
+    }
+
+    try {
+      const state = scannerRef.current.getState();
+      if (state === Html5QrcodeScannerState.SCANNING) {
+        await scannerRef.current.pause();
+        setIsScanning(false);
+      }
+    } catch (error) {
+      console.error('Error pausing scanner:', error);
     }
   };
 
   const handleResume = async () => {
-    if (scannerRef.current) {
-      await scannerRef.current.resume();
-      setIsScanning(true);
-      setScanResult(null);
+    if (!scannerRef.current || !isInitialized) {
+      console.warn('Scanner not ready');
+      return;
+    }
+
+    try {
+      const state = scannerRef.current.getState();
+      if (state === Html5QrcodeScannerState.PAUSED) {
+        await scannerRef.current.resume();
+        setIsScanning(true);
+        setScanResult(null);
+      }
+    } catch (error) {
+      console.error('Error resuming scanner:', error);
     }
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-4 text-gray-800">QR Code Scanner</h2>
+
+      {!isInitialized && (
+        <div className="mb-4 p-4 bg-blue-100 text-blue-700 rounded">
+          Initializing camera... Please allow camera access if prompted.
+        </div>
+      )}
 
       <div id="qr-scanner" className="w-full mb-4"></div>
 
@@ -144,7 +189,7 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
               <p>Class: {scanResult.class}</p>
             </div>
           ) : (
-            <p>✗ Error: {scanResult.error}</p>
+            <p>✗ Error: {scanResult.error || 'Failed to process scan'}</p>
           )}
         </div>
       )}
@@ -153,14 +198,16 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
         {isScanning ? (
           <button
             onClick={handlePause}
-            className="flex-1 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700"
+            disabled={!isInitialized}
+            className="flex-1 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ⏸ Pause Scanner
           </button>
         ) : (
           <button
             onClick={handleResume}
-            className="flex-1 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"
+            disabled={!isInitialized}
+            className="flex-1 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ▶ Resume Scanner
           </button>
