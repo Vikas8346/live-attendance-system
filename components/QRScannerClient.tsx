@@ -94,7 +94,14 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
         };
 
         const handleError = (error: any) => {
-          console.error('QR Scan error:', error);
+          // Suppress NotFoundException errors - these are normal when no QR code is detected
+          // Only log actual errors (permission denied, camera not found, etc)
+          const errorMessage = error?.message || error?.toString() || '';
+          if (!errorMessage.includes('NotFoundException') &&
+              !errorMessage.includes('No MultiFormat') &&
+              !errorMessage.includes('code parse error')) {
+            console.error('QR Scan error:', error);
+          }
         };
 
         await scanner.render(handleSuccess, handleError);
