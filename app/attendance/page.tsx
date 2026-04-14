@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { getAttendanceByDate, initializeDemoData } from '@/lib/demoStorage';
 
 interface AttendanceRecord {
   _id: string;
@@ -21,26 +22,20 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState('');
 
-  const fetchAttendance = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (selectedDate) {
-        params.append('date', selectedDate);
-      }
-      const response = await fetch(`/api/attendance?${params}`);
-      const data = await response.json();
-      setAttendance(data.data || []);
-    } catch (error) {
-      console.error('Failed to fetch attendance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAttendance = useCallback(() => {
+    setAttendance(getAttendanceByDate(selectedDate));
+    setLoading(false);
+  }, [selectedDate]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchAttendance();
-  }, [selectedDate]);
+    initializeDemoData();
+
+    const timeoutId = window.setTimeout(() => {
+      fetchAttendance();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchAttendance]);
 
   const filteredAttendance = selectedClass
     ? attendance.filter((record) => record.studentId.class === selectedClass)
@@ -62,7 +57,10 @@ export default function AttendancePage() {
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setLoading(true);
+                setSelectedDate(e.target.value);
+              }}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>

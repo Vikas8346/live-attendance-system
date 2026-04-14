@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getDashboardStats, initializeDemoData } from '@/lib/demoStorage';
 
 interface Stats {
   totalStudents: number;
@@ -18,35 +19,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const [studentsRes, attendanceRes] = await Promise.all([
-          fetch('/api/students'),
-          fetch('/api/attendance'),
-        ]);
-
-        const studentsData = await studentsRes.json();
-        const attendanceData = await attendanceRes.json();
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const presentToday = attendanceData.data?.filter((record: any) => {
-          const recordDate = new Date(record.date);
-          recordDate.setHours(0, 0, 0, 0);
-          return recordDate.getTime() === today.getTime();
-        }).length || 0;
-
-        setStats({
-          totalStudents: studentsData.data?.length || 0,
-          totalAttendance: attendanceData.data?.length || 0,
-          presentToday,
-        });
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      } finally {
-        setLoading(false);
-      }
+    const fetchStats = () => {
+      initializeDemoData();
+      setStats(getDashboardStats());
+      setLoading(false);
     };
 
     fetchStats();

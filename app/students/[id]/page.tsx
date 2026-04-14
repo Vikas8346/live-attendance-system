@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import QRDisplay from '@/components/QRDisplay';
 import Link from 'next/link';
+import QRCode from 'qrcode';
+import { getStudentById, initializeDemoData } from '@/lib/demoStorage';
 
 interface Student {
   _id: string;
@@ -12,7 +14,7 @@ interface Student {
   studentId: string;
   class: string;
   rollNumber: number;
-  qrDataUrl: string;
+  qrCode: string;
 }
 
 export default function StudentDetailPage() {
@@ -24,22 +26,42 @@ export default function StudentDetailPage() {
   useEffect(() => {
     if (!id) return;
 
-    const fetchStudent = async () => {
-      try {
-        const response = await fetch(`/api/students/${id}`);
-        const data = await response.json();
-        if (data.success) {
-          setStudent(data.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch student:', error);
-      } finally {
-        setLoading(false);
-      }
+    initializeDemoData();
+
+    const fetchStudent = () => {
+      const foundStudent = getStudentById(id);
+      setStudent(foundStudent);
+      setLoading(false);
     };
 
     fetchStudent();
   }, [id]);
+
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    const loadQrData = async () => {
+      if (!student?.qrCode) {
+        setQrDataUrl('');
+        return;
+      }
+
+      try {
+        const dataUrl = await QRCode.toDataURL(student.qrCode, {
+          errorCorrectionLevel: 'H',
+          type: 'image/png',
+          width: 300,
+          margin: 1,
+        });
+
+        setQrDataUrl(dataUrl);
+      } catch (error) {
+        console.error('Failed to generate QR code:', error);
+      }
+    };
+
+    loadQrData();
+  }, [student]);
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -81,11 +103,17 @@ export default function StudentDetailPage() {
           </div>
         </div>
 
-        <QRDisplay
-          qrDataUrl={student.qrDataUrl}
-          studentName={student.name}
-          studentId={student.studentId}
-        />
+        {qrDataUrl ? (
+          <QRDisplay
+            qrDataUrl={qrDataUrl}
+            studentName={student.name}
+            studentId={student.studentId}
+          />
+        ) : (
+          <div className="bg-white p-8 rounded-lg shadow-md text-center text-gray-600">
+            Generating QR code...
+          </div>
+        )}
       </div>
     </div>
   );

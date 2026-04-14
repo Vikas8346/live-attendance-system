@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Student from '@/models/Student';
 import { v4 as uuidv4 } from 'uuid';
-import QRCode from 'qrcode';
 
 export async function GET() {
   try {
@@ -22,6 +21,13 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     const { name, email, studentId, class: className, rollNumber } = await request.json();
 
+    if (!name || !email || !studentId || !className || Number.isNaN(Number(rollNumber))) {
+      return NextResponse.json(
+        { success: false, error: 'name, email, studentId, class and valid rollNumber are required' },
+        { status: 400 }
+      );
+    }
+
     // Generate unique QR code value
     const qrValue = uuidv4();
 
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
       studentId,
       qrCode: qrValue,
       class: className,
-      rollNumber,
+      rollNumber: Number(rollNumber),
     });
 
     const savedStudent = await newStudent.save();
@@ -41,6 +47,19 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: number }).code === 11000
+    ) {
+      const duplicateField = Object.keys((error as { keyPattern?: Record<string, unknown> }).keyPattern || {})[0] || 'field';
+      return NextResponse.json(
+        { success: false, error: `${duplicateField} already exists` },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 400 }

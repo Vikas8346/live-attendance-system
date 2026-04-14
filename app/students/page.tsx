@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AddStudentForm from '@/components/AddStudentForm';
+import { deleteStudentById, getStudents, initializeDemoData } from '@/lib/demoStorage';
 
 interface Student {
   _id: string;
@@ -20,38 +21,31 @@ export default function StudentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchStudents = async () => {
-    try {
-      const response = await fetch('/api/students');
-      const data = await response.json();
-      setStudents(data.data || []);
-    } catch (error) {
-      console.error('Failed to fetch students:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchStudents = useCallback(() => {
+    setStudents(getStudents());
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    initializeDemoData();
+
+    const timeoutId = window.setTimeout(() => {
+      fetchStudents();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchStudents]);
 
   const filteredStudents = students.filter((student) =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.studentId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDeleteStudent = async (id: string) => {
+  const handleDeleteStudent = (id: string) => {
     if (!confirm('Are you sure you want to delete this student?')) return;
 
-    try {
-      const response = await fetch(`/api/students/${id}`, { method: 'DELETE' });
-      if (response.ok) {
-        setStudents(students.filter((s) => s._id !== id));
-      }
-    } catch (error) {
-      console.error('Failed to delete student:', error);
-    }
+    deleteStudentById(id);
+    setStudents((prev) => prev.filter((s) => s._id !== id));
   };
 
   return (

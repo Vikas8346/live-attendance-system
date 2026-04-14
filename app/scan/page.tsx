@@ -11,10 +11,17 @@ interface ScanLog {
   timestamp: string;
 }
 
+interface ScanResult {
+  success: boolean;
+  studentName?: string;
+  studentId?: string;
+  class?: string;
+}
+
 export default function ScanPage() {
   const [scans, setScans] = useState<ScanLog[]>([]);
 
-  const handleScan = (result: any) => {
+  const handleScan = (result: ScanResult) => {
     if (result.success) {
       const scan: ScanLog = {
         id: Date.now().toString(),

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const studentId = searchParams.get('studentId');
     const date = searchParams.get('date');
 
-    let query: Record<string, unknown> = {};
+    const query: Record<string, unknown> = {};
 
     if (studentId) {
       query.studentId = studentId;

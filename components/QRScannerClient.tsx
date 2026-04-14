@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeScannerState } from 'html5-qrcode';
+import { initializeDemoData, processQrScan } from '@/lib/demoStorage';
 
 interface ScanResult {
   success: boolean;
@@ -24,6 +25,8 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
   useEffect(() => {
     let scanner: Html5QrcodeScanner;
     let isMounted = true;
+
+    initializeDemoData();
 
     const startScanner = async () => {
       try {
@@ -49,19 +52,13 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
               setIsScanning(false);
             }
 
-            const response = await fetch('/api/scan', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ qrData: decodedText }),
-            });
-
-            const data = await response.json();
+            const data = processQrScan(decodedText);
 
             const result: ScanResult = {
               success: data.success,
-              studentName: data.data?.student?.name,
-              studentId: data.data?.student?.studentId,
-              class: data.data?.student?.class,
+              studentName: data.studentName,
+              studentId: data.studentId,
+              class: data.class,
               error: data.error,
             };
 
@@ -78,7 +75,7 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
                 }
               }
             }, 2000);
-          } catch (error) {
+          } catch {
             setScanResult({
               success: false,
               error: 'Failed to process scan',
@@ -93,10 +90,10 @@ export default function QRScannerClient({ onScan }: QRScannerClientProps) {
           }
         };
 
-        const handleError = (error: any) => {
+        const handleError = (error: unknown) => {
           // Suppress NotFoundException errors - these are normal when no QR code is detected
           // Only log actual errors (permission denied, camera not found, etc)
-          const errorMessage = error?.message || error?.toString() || '';
+          const errorMessage = error instanceof Error ? error.message : String(error || '');
           if (!errorMessage.includes('NotFoundException') &&
               !errorMessage.includes('No MultiFormat') &&
               !errorMessage.includes('code parse error')) {

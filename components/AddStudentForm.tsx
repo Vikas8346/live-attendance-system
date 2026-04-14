@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { addStudent } from '@/lib/demoStorage';
 
 interface AddStudentFormProps {
   onSuccess?: () => void;
@@ -19,24 +20,19 @@ export default function AddStudentForm({ onSuccess }: AddStudentFormProps) {
 
     const formData = new FormData(e.currentTarget);
     const data = {
-      name: formData.get('name'),
-      email: formData.get('email'),
-      studentId: formData.get('studentId'),
-      class: formData.get('class'),
+      name: (formData.get('name') as string) || '',
+      email: (formData.get('email') as string) || '',
+      studentId: (formData.get('studentId') as string) || '',
+      class: (formData.get('class') as string) || '',
       rollNumber: parseInt(formData.get('rollNumber') as string),
     };
 
     try {
-      const response = await fetch('/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add student');
+      if (Number.isNaN(data.rollNumber)) {
+        throw new Error('rollNumber must be a valid number');
       }
+
+      addStudent(data);
 
       setSuccess('Student added successfully!');
       e.currentTarget.reset();

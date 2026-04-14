@@ -28,6 +28,25 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', (e) => {
+                if (e.message?.includes('MetaMask') || e.filename?.includes('inpage.js')) {
+                  e.preventDefault();
+                }
+              });
+              window.addEventListener('unhandledrejection', (e) => {
+                const msg = e.reason?.toString?.() || '';
+                if (msg.includes('MetaMask') || msg.includes('extension not found')) {
+                  e.preventDefault();
+                }
+              });
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-gray-50">
         <Navbar />
         <main className="flex-1">
